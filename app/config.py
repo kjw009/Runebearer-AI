@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -5,8 +7,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # LLM
-    anthropic_api_key: str
+    anthropic_api_key: Optional[str] = None
     openai_api_key: str
+    openai_base_url: Optional[str] = None
 
     # Postgres
     postgres_user: str = "postgres"
