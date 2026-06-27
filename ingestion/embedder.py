@@ -1,5 +1,6 @@
 from openai import AsyncOpenAI
 import asyncpg
+from app.config import settings
 from app.db.repositories.vectors import VectorRepository
 from ingestion.chunker import Chunk
 
@@ -15,9 +16,14 @@ class IngestEmbedder:
     """
 
     def __init__(self, pool: asyncpg.Pool, batch_size: int = 100) -> None:
-        # AsyncOpenAI reads OPENAI_API_KEY from the environment automatically —
-        # no need to pass it explicitly.
-        self._client = AsyncOpenAI()
+        # Pass credentials explicitly from pydantic settings rather than relying
+        # on environment variables being set in the shell. This also handles
+        # Azure OpenAI — if OPENAI_BASE_URL is set in .env, the client routes
+        # requests to the Azure endpoint instead of api.openai.com.
+        self._client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+        )
 
         # VectorRepository owns all SQL for the documents table. IngestEmbedder
         # delegates storage to it rather than writing SQL directly, keeping
