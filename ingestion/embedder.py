@@ -22,7 +22,7 @@ class IngestEmbedder:
         # requests to the Azure endpoint instead of api.openai.com.
         self._client = AsyncOpenAI(
             api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
+            base_url=settings.openai_base_url,  # None falls back to api.openai.com
         )
 
         # VectorRepository owns all SQL for the documents table. IngestEmbedder
