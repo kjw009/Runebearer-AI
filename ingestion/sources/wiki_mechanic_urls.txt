@@ -1,7 +1,6 @@
 # Elden Ring mechanics and status effect pages
 https://eldenring.wiki.fextralife.com/Hemorrhage
 https://eldenring.wiki.fextralife.com/Frostbite
-https://eldenring.wiki.fextralife.com/Rot
 https://eldenring.wiki.fextralife.com/Sleep
 https://eldenring.wiki.fextralife.com/Madness
 https://eldenring.wiki.fextralife.com/Poison
