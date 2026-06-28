@@ -13,9 +13,13 @@ CREATE TABLE IF NOT EXISTS documents (
     scraped_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE documents 
+ADD CONSTRAINT documents_source_chunk_unique
+    UNIQUE (source_url, chunk_index);
+
 CREATE INDEX IF NOT EXISTS documents_embedding_idx
     ON documents USING hnsw (embedding vector_cosine_ops)
     WITH (m = 16, ef_construction = 64);
 
 CREATE INDEX IF NOT EXISTS documents_entity_type_idx
-    ON documents (entity_type);
+    ON documents (entity_type)

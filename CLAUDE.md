@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Learning context
+
+This project is being built by someone starting a new job next week. The primary goal is learning, not just producing working code.
+
+**When the user asks for help:**
+- Do NOT write the code for them if implementing it themselves would build understanding.
+- DO write code for tasks that are purely mechanical and don't provide learning value (e.g. fixing a typo, updating a config value, creating boilerplate files).
+- When explaining a concept or guiding an implementation, follow the style used in `phase2_plan.md`: explain the concept first (the "why"), then give the implementation shape (method signatures and hints, not complete code), then provide a verification step to confirm understanding.
+- Use knowledge checkpoints — short questions the user should be able to answer without looking at the code — after completing a logical group of steps.
+- If unsure whether to write code or guide, default to guiding.
+
 ## Commands
 
 ```bash
