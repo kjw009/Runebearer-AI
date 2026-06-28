@@ -26,7 +26,7 @@ class Retriever:
             return 0.0  # Avoid division by zero; treat zero vectors as having no similarity
         return float(np.dot(arr_a, arr_b) / (norm_a * norm_b))
         
-    def _mmr(self, query_vector: list[float], candidate_chunks: list[RagChunk], lambda_param: float = 0.5, top_k: int = 5) -> list[dict]:
+    def _mmr(self, query_vector: list[float], candidate_chunks: list[dict], lambda_param: float = 0.5, top_k: int = 5) -> list[dict]:
         """Applies Maximal Marginal Relevance (MMR) to select diverse and relevant chunks"""
         if not candidate_chunks:
             return []

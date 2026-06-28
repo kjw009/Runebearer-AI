@@ -1,16 +1,19 @@
 import logging
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
+from app.config import settings
 
-class QueryExpansion:
+class QueryExpansion(BaseModel):
     variants: list[str] = Field(
         ..., 
         description="Exactly 3 search-optimized query reformulations containing enriched domain vocabulary."
     )
 
-class QueryRewriter:
+class QueryRewriter():
     def __init__(self) -> None:
-        self._client = AsyncOpenAI()
+        self._client = AsyncOpenAI(
+            api_key=settings.openai_api_key
+        )
 
     async def rewrite(self, query: str, calling_agent: str) -> list[str]:
         """Rewrites the query to be more specific and relevant to the calling agent"""
@@ -33,13 +36,13 @@ class QueryRewriter:
                     {"role": "user", "content": user_content}
                 ],
                 response_format=QueryExpansion,
-                temperature=0.1,
+                temperature=0.1,  # low = deterministic expansion; high would produce inconsistent keywords across calls
                 max_tokens=300
             )
             # Extract the parsed Pydantic object directly from the response wrapper
             parsed_response: QueryExpansion = response.choices[0].message.parsed
             if parsed_response and len(parsed_response.variants) >= 3:
-                return parsed_response.variants[:3]  # Return exactly 3 variants
+                return parsed_response.variants[:3]  # guard: model occasionally returns 4+ despite the prompt instruction
         except Exception as e:
             logging.error(f"Failed to cleanly execute or parse OpenAI query rewrite: {str(e)}")
         
