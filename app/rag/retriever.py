@@ -1,5 +1,4 @@
 import numpy as np
-from dataclasses import dataclass
 import asyncpg
 from app.db.repositories.vectors import VectorRepository
 from app.rag.embedder import Embedder
