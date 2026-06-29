@@ -3,14 +3,7 @@ from dataclasses import dataclass
 import asyncpg
 from app.db.repositories.vectors import VectorRepository
 from app.rag.embedder import Embedder
-
-@dataclass
-class RagChunk:
-    content: str
-    source_url: str
-    page_title: str
-    section: str
-    similarity_score: float
+from app.graph.state import RagChunk, Citation
 
 class Retriever:
     def __init__(self, pool: asyncpg.Pool) -> None:
@@ -89,9 +82,12 @@ class Retriever:
         return [
             RagChunk(
                 content=chunk['content'],
-                source_url=chunk['source_url'],
-                page_title=chunk['page_title'],
-                section=chunk['section'],
+                citation=Citation(
+                    source_url=chunk['source_url'],
+                    page_title=chunk['page_title'],
+                    section=chunk['section'],
+                    chunk_index=chunk['chunk_index'],
+                ),
                 similarity_score=chunk['similarity_score']
             )
             for chunk in diverse_chunks
