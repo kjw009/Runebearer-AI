@@ -44,7 +44,7 @@ class QueryRewriter():
             if parsed_response and len(parsed_response.variants) >= 3:
                 return parsed_response.variants[:3]  # guard: model occasionally returns 4+ despite the prompt instruction
         except Exception as e:
-            logging.error(f"Failed to rewrite query: %s", e)
+            logging.error("Failed to rewrite query: %s", e)
         
         # Safe resilient fallback strategy returning the original query if the API fails
         return [query]
