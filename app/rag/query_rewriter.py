@@ -29,7 +29,7 @@ class QueryRewriter():
         
         try:
             # Using beta.chat.completions.parse to automatically handle Pydantic validation
-            response = await self._client.beta.chat.completions.create(
+            response = await self._client.beta.chat.completions.parse(
                 model="gpt-4o-mini", # Highly capable and cost-effective for structured rewrites
                 messages=[
                     {"role": "system", "content": system_instructions},
@@ -40,11 +40,11 @@ class QueryRewriter():
                 max_tokens=300
             )
             # Extract the parsed Pydantic object directly from the response wrapper
-            parsed_response: QueryExpansion = response.choices[0].message.parsed
+            parsed_response: QueryExpansion | None = response.choices[0].message.parsed
             if parsed_response and len(parsed_response.variants) >= 3:
                 return parsed_response.variants[:3]  # guard: model occasionally returns 4+ despite the prompt instruction
         except Exception as e:
-            logging.error(f"Failed to cleanly execute or parse OpenAI query rewrite: {str(e)}")
+            logging.error(f"Failed to rewrite query: %s", e)
         
         # Safe resilient fallback strategy returning the original query if the API fails
         return [query]
