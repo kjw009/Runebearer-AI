@@ -36,25 +36,25 @@ elden-rag/
 │   │
 │   ├── agents/
 │   │   ├── __init__.py
-│   │   ├── supervisor.py              # SupervisorAgent: intent classification + synthesis
-│   │   ├── rag_agent.py               # RAGAgent: query rewrite + retrieval + rerank
-│   │   ├── build_creation.py          # BuildCreationAgent
-│   │   ├── stat_prioritisation.py     # StatPrioritisationAgent
-│   │   ├── item_loot.py               # ItemLootAgent
-│   │   ├── boss_optimisation.py       # BossOptimisationAgent
-│   │   ├── combat_execution.py        # CombatExecutionAgent
-│   │   └── status_effect.py           # StatusEffectAgent
+│   │   ├── guidance_of_grace.py        # Supervisor: intent classification + synthesis
+│   │   ├── maiden_melina.py            # Onboarding: player profile interview, gates access
+│   │   ├── rag_agent.py                # RAGAgent: query rewrite + retrieval + rerank
+│   │   ├── master_hewg.py              # build_creation
+│   │   ├── queen_rennala.py            # stat_prioritisation
+│   │   ├── merchant_kale.py            # item_loot
+│   │   ├── sir_gideon_ofnir.py         # boss_optimisation + status_effect (merged)
+│   │   └── iron_fist_alexander.py      # combat_execution
 │   │
 │   ├── prompts/
 │   │   ├── __init__.py
-│   │   ├── supervisor.py
+│   │   ├── guidance_of_grace.py
+│   │   ├── maiden_melina.py
 │   │   ├── rag_agent.py
-│   │   ├── build_creation.py
-│   │   ├── stat_prioritisation.py
-│   │   ├── item_loot.py
-│   │   ├── boss_optimisation.py
-│   │   ├── combat_execution.py
-│   │   └── status_effect.py
+│   │   ├── master_hewg.py
+│   │   ├── queen_rennala.py
+│   │   ├── merchant_kale.py
+│   │   ├── sir_gideon_ofnir.py
+│   │   └── iron_fist_alexander.py
 │   │
 │   ├── models/
 │   │   ├── __init__.py
@@ -116,6 +116,10 @@ elden-rag/
 
 ### ASCII Graph Diagram
 
+Node names below are the literal `next_agent` / routing-dict keys — Guidance of Grace's
+supervisor prompt emits these persona-flavored tokens directly, so the graph's node ids
+match the prompt's own routing table verbatim (no translation layer between the two).
+
 ```
                         ┌─────────────────┐
                         │   Player Query  │
@@ -123,22 +127,37 @@ elden-rag/
                                  │
                                  ▼
                     ┌────────────────────────┐
-               ┌───│     SUPERVISOR NODE     │◄──────────────────────┐
-               │   │  - Classify intents     │                       │
-               │   │  - Pop intent queue     │                       │
-               │   │  - Synthesise if done   │                       │
-               │   └────────────────────────┘                       │
-               │                │                                    │
-               │    ┌───────────┼────────────┐                      │
-               │    │           │            │                      │
-               │    ▼           ▼            ▼                      │
-               │ ┌──────┐  ┌──────┐   ┌──────────┐                 │
-               │ │BUILD │  │ STAT │   │  ITEM &  │                 │
-               │ │CREAT.│  │PRIOR.│   │   LOOT   │                 │
-               │ └──┬───┘  └──┬───┘   └────┬─────┘                 │
-               │   │          │             │                       │
-               │   └──────────┼─────────────┘                      │
-               │              │ (all specialists call RAG node)     │
+               ┌───│  guidance_of_grace       │◄──────────────────────┐
+               │   │  (supervisor)            │                       │
+               │   │  - Classify intents      │                       │
+               │   │  - Pop intent queue      │                       │
+               │   │  - Synthesise if done    │                       │
+               │   └────────────────────────┘                        │
+               │                │                                     │
+               │   onboarding_completed == false ──┐                  │
+               │                │                  ▼                  │
+               │                │      ┌────────────────────────┐    │
+               │                │      │  melina_onboarding      │────┘
+               │                │      │  (no RAG round-trip —   │
+               │                │      │   returns to supervisor │
+               │                │      │   directly)             │
+               │                │      └────────────────────────┘
+               │                ▼
+               │    ┌───────────┼──────────────┬──────────────┬──────┐
+               │    │           │              │              │      │
+               │    ▼           ▼              ▼              ▼      │
+               │ ┌──────┐  ┌────────┐   ┌───────────┐  ┌───────────┐│
+               │ │MASTER│  │ QUEEN  │   │  MERCHANT │  │ IRON FIST ││
+               │ │ HEWG │  │RENNALA │   │   KALÉ    │  │ ALEXANDER ││
+               │ └──┬───┘  └───┬────┘   └─────┬─────┘  └─────┬─────┘│
+               │   │          │               │              │      │
+               │   │      ┌───┴───────────┐   │              │      │
+               │   │      │ SIR GIDEON    │   │              │      │
+               │   │      │ OFNIR (boss + │   │              │      │
+               │   │      │ status_effect)│   │              │      │
+               │   │      └───┬───────────┘   │              │      │
+               │   └──────────┼───────────────┼──────────────┘      │
+               │              │ (every specialist calls RAG node)   │
                │              ▼                                     │
                │   ┌──────────────────────┐                        │
                │   │      RAG NODE        │                        │
@@ -148,16 +167,9 @@ elden-rag/
                │   │  - Cross-enc rerank  │                        │
                │   │  - Return citations  │                        │
                │   └──────────┬───────────┘                        │
-               │              │                                     │
-               │   ┌──────────┼────────────┐                       │
-               │   │          │            │                        │
-               │   ▼          ▼            ▼                       │
-               │ ┌──────┐  ┌──────┐  ┌─────────┐                  │
-               │ │ BOSS │  │COMBAT│  │ STATUS  │                  │
-               │ │OPTIM.│  │ EXEC.│  │ EFFECT  │                  │
-               │ └──┬───┘  └──┬───┘  └────┬────┘                  │
-               │   └──────────┼────────────┘                       │
-               │              │ (return to supervisor)              │
+               │              │ (returns to whichever specialist     │
+               │              │  set `calling_agent`, then that      │
+               │              │  specialist returns to supervisor)   │
                └──────────────┴────────────────────────────────────┘
                               │
                 (supervisor decides: next intent or END)
@@ -169,6 +181,10 @@ elden-rag/
                     └─────────────────┘
 ```
 
+All 5 specialists (Hewg, Rennala, Kalé, Alexander, Gideon) are structurally identical:
+phase 1 sets `calling_agent` and routes to RAG, phase 2 runs with `rag_context` populated
+and returns to the supervisor. Melina is the one exception — she never touches RAG.
+
 ### Node Definitions
 
 **File:** `app/graph/builder.py`
@@ -177,55 +193,61 @@ elden-rag/
 from langgraph.graph import StateGraph, END
 from app.graph.state import BuildState
 from app.graph.edges import route_from_supervisor, route_from_specialist
-from app.agents.supervisor import supervisor_node
+from app.agents.guidance_of_grace import guidance_of_grace_node
+from app.agents.maiden_melina import melina_onboarding_node
 from app.agents.rag_agent import rag_node
-from app.agents.build_creation import build_creation_node
-from app.agents.stat_prioritisation import stat_prioritisation_node
-from app.agents.item_loot import item_loot_node
-from app.agents.boss_optimisation import boss_optimisation_node
-from app.agents.combat_execution import combat_execution_node
-from app.agents.status_effect import status_effect_node
+from app.agents.master_hewg import master_hewg_build_node
+from app.agents.queen_rennala import rennala_stats_node
+from app.agents.merchant_kale import kale_loot_routes_node
+from app.agents.sir_gideon_ofnir import gideon_all_knowing_node
+from app.agents.iron_fist_alexander import alexander_combat_node
+
+
+SPECIALISTS = [
+    "master_hewg_build", "rennala_stats", "kale_loot_routes",
+    "gideon_all_knowing", "alexander_combat",
+]
 
 
 def build_graph() -> StateGraph:
     graph = StateGraph(BuildState)
 
-    graph.add_node("supervisor", supervisor_node)
+    graph.add_node("guidance_of_grace", guidance_of_grace_node)
+    graph.add_node("melina_onboarding", melina_onboarding_node)
     graph.add_node("rag", rag_node)
-    graph.add_node("build_creation", build_creation_node)
-    graph.add_node("stat_prioritisation", stat_prioritisation_node)
-    graph.add_node("item_loot", item_loot_node)
-    graph.add_node("boss_optimisation", boss_optimisation_node)
-    graph.add_node("combat_execution", combat_execution_node)
-    graph.add_node("status_effect", status_effect_node)
+    graph.add_node("master_hewg_build", master_hewg_build_node)
+    graph.add_node("rennala_stats", rennala_stats_node)
+    graph.add_node("kale_loot_routes", kale_loot_routes_node)
+    graph.add_node("gideon_all_knowing", gideon_all_knowing_node)
+    graph.add_node("alexander_combat", alexander_combat_node)
 
-    graph.set_entry_point("supervisor")
+    graph.set_entry_point("guidance_of_grace")
 
-    # Supervisor routes to a specialist or END
+    # Supervisor routes to onboarding, a specialist, or END
     graph.add_conditional_edges(
-        "supervisor",
+        "guidance_of_grace",
         route_from_supervisor,
         {
-            "build_creation": "build_creation",
-            "stat_prioritisation": "stat_prioritisation",
-            "item_loot": "item_loot",
-            "boss_optimisation": "boss_optimisation",
-            "combat_execution": "combat_execution",
-            "status_effect": "status_effect",
+            "melina_onboarding": "melina_onboarding",
+            "master_hewg_build": "master_hewg_build",
+            "rennala_stats": "rennala_stats",
+            "kale_loot_routes": "kale_loot_routes",
+            "gideon_all_knowing": "gideon_all_knowing",
+            "alexander_combat": "alexander_combat",
             END: END,
         },
     )
 
+    # Melina never touches RAG — she always returns straight to the supervisor
+    graph.add_edge("melina_onboarding", "guidance_of_grace")
+
     # Each specialist goes to RAG first, then back to the specialist via a
     # sub-routing edge, then returns to supervisor
-    for specialist in [
-        "build_creation", "stat_prioritisation", "item_loot",
-        "boss_optimisation", "combat_execution", "status_effect",
-    ]:
+    for specialist in SPECIALISTS:
         graph.add_conditional_edges(
             specialist,
             route_from_specialist,
-            {"rag": "rag", "supervisor": "supervisor"},
+            {"rag": "rag", "guidance_of_grace": "guidance_of_grace"},
         )
 
     # RAG always returns to the specialist that called it
@@ -233,12 +255,11 @@ def build_graph() -> StateGraph:
         "rag",
         lambda s: s["calling_agent"],
         {
-            "build_creation": "build_creation",
-            "stat_prioritisation": "stat_prioritisation",
-            "item_loot": "item_loot",
-            "boss_optimisation": "boss_optimisation",
-            "combat_execution": "combat_execution",
-            "status_effect": "status_effect",
+            "master_hewg_build": "master_hewg_build",
+            "rennala_stats": "rennala_stats",
+            "kale_loot_routes": "kale_loot_routes",
+            "gideon_all_knowing": "gideon_all_knowing",
+            "alexander_combat": "alexander_combat",
         },
     )
 
@@ -254,15 +275,18 @@ from app.graph.state import BuildState
 
 
 SPECIALIST_AGENTS = {
-    "build_creation", "stat_prioritisation", "item_loot",
-    "boss_optimisation", "combat_execution", "status_effect",
+    "master_hewg_build", "rennala_stats", "kale_loot_routes",
+    "gideon_all_knowing", "alexander_combat",
 }
+ONBOARDING_AGENT = "melina_onboarding"
 
 
 def route_from_supervisor(state: BuildState) -> str:
-    """Route supervisor output to next specialist or END."""
+    """Route supervisor output to onboarding, the next specialist, or END."""
     next_agent = state.get("next_agent", "END")
-    if next_agent == "END" or next_agent not in SPECIALIST_AGENTS:
+    if next_agent == "END":
+        return "__end__"
+    if next_agent != ONBOARDING_AGENT and next_agent not in SPECIALIST_AGENTS:
         return "__end__"
     return next_agent
 
@@ -271,7 +295,7 @@ def route_from_specialist(state: BuildState) -> str:
     """Route specialist: go to RAG if it hasn't been called yet, else return to supervisor."""
     if not state.get("rag_context") and not state.get("rag_results"):
         return "rag"
-    return "supervisor"
+    return "guidance_of_grace"
 ```
 
 ---
@@ -287,6 +311,13 @@ from typing import Annotated, Optional
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
+
+
+class PlayerProfile(TypedDict):
+    experience_level: str      # "total_beginner", "souls_veteran", "returning_player"
+    skill_confidence: str      # "very_low", "low", "medium", "high", "very_high"
+    preferred_archetype: str   # "HEAVY_MELEE", "FAST_AGGRESSIVE", "SPELLCASTER", "HYBRID"
+    current_hurdle: Optional[str]  # e.g., "Stuck on Margit", "New Character"
 
 
 class BuildStats(BaseModel):
@@ -337,6 +368,11 @@ class BuildState(TypedDict):
     intent_queue: list[str]   # remaining intents yet to be processed
     final_response: Optional[str]
 
+    # ── Player Profile (onboarding) ───────────────────────────────
+    onboarding_completed: bool
+    player_profile: PlayerProfile
+    current_level: Optional[int]
+
     # ── Build ────────────────────────────────────────────────────
     player_class: Optional[str]
     stats: Optional[BuildStats]
@@ -357,6 +393,11 @@ class BuildState(TypedDict):
     # ── Observability ────────────────────────────────────────────
     trace_id: Optional[str]
 ```
+
+Onboarding-gated routing: Guidance of Grace (the supervisor) checks `onboarding_completed`
+before classifying intent. While it's `false`, `next_agent` is forced to `melina_onboarding`
+regardless of what the player asked — see `guidance_of_grace.py`'s prompt for the exact
+wording of that rule.
 
 **File:** `app/models/build.py`
 
@@ -465,220 +506,31 @@ CREATE INDEX ON documents (entity_type);
 
 ## 5. Agent Prompt Templates
 
-**File:** `app/prompts/supervisor.py`
+Prompt content is persona-driven rather than genre-generic — each specialist is written
+as an in-universe Elden Ring character rather than a plainly-named role. The table below
+is the current source of truth for which file backs which routing key; the full prompt
+text lives in the actual files, not duplicated here, so there's only one place for it to
+drift out of date.
 
-```python
-SUPERVISOR_SYSTEM = """\
-You are the Elden Ring AI Game Master coordinating specialist agents to help players \
-optimise their journey through the Lands Between.
+| Routing key (`next_agent` / `calling_agent`) | Persona | File | Constant | Domain |
+|---|---|---|---|---|
+| `guidance_of_grace` (supervisor, entry point) | Guidance of Grace | `app/prompts/guidance_of_grace.py` | `GUIDANCE_OF_GRACE` | Intent classification, routing, synthesis |
+| `melina_onboarding` | Maiden Melina | `app/prompts/maiden_melina.py` | `MAIDEN_MELINA` | Player profile interview; gates access until `onboarding_completed` |
+| — (not a persona) | — | `app/prompts/rag_agent.py` | `RAG_CONTEXT_TEMPLATE` | Formats reranked chunks into `rag_context`; no LLM call |
+| `master_hewg_build` | Master Hewg | `app/prompts/master_hewg.py` | `MASTER_HEWG` | build_creation — class, weapons, talismans, affinities |
+| `rennala_stats` | Queen Rennala | `app/prompts/queen_rennala.py` | `QUEEN_RENNALA` | stat_prioritisation — soft caps, leveling roadmap |
+| `kale_loot_routes` | Merchant Kalé | `app/prompts/merchant_kale.py` | `MERCHANT_KALE` | item_loot — acquisition routes, quest-lock warnings |
+| `alexander_combat` | Iron Fist Alexander | `app/prompts/iron_fist_alexander.py` | `ALEXANDER_COMBAT_COACH_SYSTEM` | combat_execution — move-set piloting, stamina/FP, frame data |
+| `gideon_all_knowing` | Sir Gideon Ofnir | `app/prompts/sir_gideon_ofnir.py` | `SIR_GIDEON_OFNIR` | boss_optimisation **and** status_effect (merged) — boss weaknesses, buff-stacking law, Bleed/Frost/Rot/Poison buildup math |
 
-## Current Build State
-{build_state_summary}
-
-## Available Specialist Agents
-- build_creation       — character builds, class selection, weapon/armour combos
-- stat_prioritisation  — soft cap / hard cap investment advice
-- item_loot            — item locations, acquisition methods, NPC questlines
-- boss_optimisation    — boss strategies, weaknesses, phase transitions
-- combat_execution     — moment-to-moment mechanics, timing, stamina management
-- status_effect        — bleed, poison, frost, rot, madness — application and countering
-
-## Instructions
-1. Classify the player's query into one or more of the agents above.
-2. Populate `intent` (full list) and `intent_queue` (ordered by relevance).
-3. If all intents have been addressed (intent_queue is empty), set next_agent to "END" \
-and synthesise a final response from agent_responses.
-4. Otherwise pop the first intent from intent_queue, set next_agent accordingly.
-
-Respond with valid JSON only:
-{{
-  "intents": ["<agent_name>", ...],
-  "intent_queue": ["<next_agent>", ...],
-  "next_agent": "<agent_name> | END",
-  "reasoning": "<one sentence>",
-  "final_response": "<synthesised response if next_agent == END, else null>"
-}}
-"""
-
-SUPERVISOR_HUMAN = "Player query: {player_query}"
-```
-
-**File:** `app/prompts/rag_agent.py`
-
-```python
-RAG_SYSTEM = """\
-You are the Elden Ring knowledge retrieval specialist. Your sole task is to synthesise \
-the retrieved knowledge base chunks into a concise, factual context block.
-
-Calling agent: {calling_agent}
-Build context: {build_state_summary}
-
-## Retrieved Chunks
-{retrieved_chunks}
-
-Rules:
-- Include every relevant fact from the chunks.
-- Attach a citation tag [source_N] after each fact, where N maps to the chunk index.
-- Do not hallucinate facts not present in the chunks.
-- Output plain prose, not bullet points.
-"""
-```
-
-**File:** `app/prompts/build_creation.py`
-
-```python
-BUILD_CREATION_SYSTEM = """\
-You are the Build Creation specialist for Elden Ring. You design optimal character \
-builds from the ground up or refine existing ones based on the player's desired playstyle.
-
-## Current Build State
-{build_state_json}
-
-## Knowledge Base Context
-{rag_context}
-
-## Instructions
-- Recommend starting class if player_class is null.
-- Propose stat targets at key soft caps (Vigor 40→60, damage stats 40→60→80).
-- Suggest primary and backup weapons with affinity (e.g., Cold Uchigatana, Blood Nagakiba).
-- Recommend 4 talismans with reasoning.
-- Set spirit_ash recommendation.
-- Conclude with a `state_updates` JSON block updating player_class, stats, weapons, \
-talismans, spirit_ash, and playstyle.
-
-Output format:
-<reasoning>
-...prose explanation...
-</reasoning>
-<state_updates>
-{{ "player_class": "...", "stats": {{...}}, "weapons": [...], "talismans": [...], \
-"spirit_ash": "...", "playstyle": "..." }}
-</state_updates>
-"""
-```
-
-**File:** `app/prompts/stat_prioritisation.py`
-
-```python
-STAT_SOFT_CAPS = {
-    "vigor":        [40, 60],
-    "mind":         [55, 60],
-    "endurance":    [50, 60],
-    "strength":     [54, 80],
-    "dexterity":    [55, 80],
-    "intelligence": [60, 80],
-    "faith":        [60, 80],
-    "arcane":       [45, 60, 80],
-}
-
-STAT_PRIORITISATION_SYSTEM = """\
-You are the Stat Prioritisation specialist for Elden Ring. You advise on stat investment \
-given diminishing returns at soft caps and hard caps.
-
-## Soft / Hard Cap Reference
-{soft_cap_table}
-
-## Current Build State
-{build_state_json}
-
-## Knowledge Base Context
-{rag_context}
-
-## Instructions
-- Identify which stats are below their first soft cap and prioritise those.
-- Explain the ROI curve at each threshold.
-- Propose a level-by-level investment roadmap until the next soft cap milestone.
-- Note two-hand Strength formula (effective STR = floor(STR × 1.5)).
-- Output state_updates with updated stats.
-"""
-```
-
-**File:** `app/prompts/item_loot.py`
-
-```python
-ITEM_LOOT_SYSTEM = """\
-You are the Item & Loot specialist for Elden Ring. You know the acquisition method, \
-location, and stat requirements for every weapon, armour set, talisman, and key item.
-
-## Current Build State
-{build_state_json}
-
-## Knowledge Base Context
-{rag_context}
-
-## Instructions
-- For each requested item, give: location, NPC/questline dependency, enemy drop rate if applicable.
-- Flag items gated behind missable questlines.
-- Note stat requirements vs current build.
-- If multiple viable options exist, rank by accessibility.
-"""
-```
-
-**File:** `app/prompts/boss_optimisation.py`
-
-```python
-BOSS_OPTIMISATION_SYSTEM = """\
-You are the Boss Optimisation specialist for Elden Ring. You provide precise strategies \
-for defeating bosses given the player's current build.
-
-## Current Build State
-{build_state_json}
-
-## Knowledge Base Context
-{rag_context}
-
-## Instructions
-- State boss HP, phase thresholds, and immunity/weakness to damage types and status effects.
-- Recommend summon (spirit ash or co-op) based on build.
-- Describe punish windows by move name.
-- Advise on positioning for each phase.
-- Suggest one-time consumable usage (Preserving Boluses, Clarifying Horn Charm, etc.).
-"""
-```
-
-**File:** `app/prompts/combat_execution.py`
-
-```python
-COMBAT_EXECUTION_SYSTEM = """\
-You are the Combat Execution specialist for Elden Ring. You advise on moment-to-moment \
-mechanics: timing, stamina management, poise, hyper-armour, and attack chains.
-
-## Current Build State
-{build_state_json}
-
-## Knowledge Base Context
-{rag_context}
-
-## Instructions
-- Reference specific weapon movesets (e.g., "R2 → R1 follow-up on Greatsword").
-- Advise on poise thresholds for hyper-armour on heavy weapons.
-- Explain roll timing windows (iframes: 13 on regular, 17 on quick roll).
-- Describe stamina cost per attack type and recommend stamina management patterns.
-- Cover guard counter opportunities where applicable.
-"""
-```
-
-**File:** `app/prompts/status_effect.py`
-
-```python
-STATUS_EFFECT_SYSTEM = """\
-You are the Status Effect specialist for Elden Ring. You advise on applying, stacking, \
-and countering bleed, poison, scarlet rot, frost, sleep, and madness.
-
-## Current Build State
-{build_state_json}
-
-## Knowledge Base Context
-{rag_context}
-
-## Instructions
-- Give buildup thresholds for target enemies/bosses (scaled by resistance stat).
-- Explain proc damage formulas (e.g., bleed: 15% + flat 150 HP).
-- List optimal weapons, incantations, and sorceries for proc application.
-- State proc duration and whether it can re-stack immediately.
-- Advise on countering status effects (consumables, talismans, armour sets).
-"""
-```
+Notes for whoever implements the agent nodes (Steps 4–7 of `phase3_plan.md`):
+- Melina, Hewg, Rennala, Alexander, and Gideon all end their `state_updates` output the
+  same way the original generic-named specialists did — only the persona voice and the
+  routing key changed, not the JSON contract.
+- Gideon absorbing status_effect means his RAG entity-type filter must cover both boss
+  and status/mechanic content — see the `ENTITY_TYPE_MAP` note in `phase3_plan.md` Step 5.
+- `boss_optimisation`/`combat_execution`/`item_loot` are advisory-only (no `state_updates`),
+  matching the original plan; Hewg and Rennala do modify build fields.
 
 ---
 
@@ -1023,23 +875,31 @@ def _summarise_build(state: dict[str, Any]) -> dict[str, Any]:
 Usage in every agent node:
 
 ```python
-# app/agents/build_creation.py
+# app/agents/master_hewg.py
 from app.observability.langfuse import agent_span
 
-@agent_span("build_creation_agent")
-async def build_creation_node(state: BuildState) -> BuildState:
+@agent_span("master_hewg_build_agent")
+async def master_hewg_build_node(state: BuildState) -> BuildState:
     ...
 ```
 
-Langfuse trace structure per query:
+Langfuse trace structure per query (first-ever query for a session, onboarding not yet done):
 ```
 Trace: session_id / player_query
-  └── Span: supervisor_agent          (intent classification)
-  └── Span: build_creation_agent      (first intent)
-      └── Span: rag_node              (retrieval for build)
-  └── Span: stat_prioritisation_agent (second intent)
-      └── Span: rag_node              (retrieval for stats)
-  └── Span: supervisor_agent          (synthesis)
+  └── Span: guidance_of_grace_agent    (sees onboarding_completed=false, routes to Melina)
+  └── Span: melina_onboarding_agent    (interview turn — no rag_node span, she skips RAG)
+  └── Span: guidance_of_grace_agent    (onboarding still incomplete → END for this turn)
+```
+
+Langfuse trace structure per query (onboarding already complete):
+```
+Trace: session_id / player_query
+  └── Span: guidance_of_grace_agent    (intent classification)
+  └── Span: master_hewg_build_agent    (first intent)
+      └── Span: rag_node               (retrieval for build)
+  └── Span: rennala_stats_agent        (second intent)
+      └── Span: rag_node               (retrieval for stats)
+  └── Span: guidance_of_grace_agent    (synthesis)
 ```
 
 ---
@@ -1223,15 +1083,16 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 | Task | File(s) |
 |------|---------|
-| Prompt templates for all 8 agents | `app/prompts/` |
-| SupervisorAgent: intent classification + synthesis | `app/agents/supervisor.py` |
+| Prompt templates for all 8 persona agents | `app/prompts/` |
+| Guidance of Grace (supervisor): intent classification + synthesis | `app/agents/guidance_of_grace.py` |
+| Maiden Melina (onboarding): profile interview, gates access | `app/agents/maiden_melina.py` |
 | RAGAgent: query rewrite → retrieve → rerank → format | `app/agents/rag_agent.py` |
-| All 6 specialist agents | `app/agents/*.py` |
+| 5 specialist agents (Hewg, Rennala, Kalé, Alexander, Gideon) | `app/agents/*.py` |
 | Edge condition functions | `app/graph/edges.py` |
 | StateGraph assembly | `app/graph/builder.py` |
 | GraphRunner: async invocation + state extraction | `app/graph/runner.py` |
 
-**Test:** Integration test with mock LLM confirming routing: supervisor → build_creation → rag → build_creation → supervisor (END). Test multi-intent query triggers two sequential specialist calls.
+**Test:** Integration test with mock LLM confirming routing: guidance_of_grace → master_hewg_build → rag → master_hewg_build → guidance_of_grace (END). Test multi-intent query triggers two sequential specialist calls. Test onboarding gate: fresh session routes to melina_onboarding regardless of query until `onboarding_completed` is `true`.
 
 ---
 

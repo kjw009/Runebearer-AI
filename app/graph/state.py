@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from typing_extensions import TypedDict
 
 class PlayerProfile(TypedDict):
-    experience_level: str # "brand_new", "returning", "veteran" , "Intermediate"
-    skill_confidence: str # "very_low", "low", "medium", "high", "very_high" 
+    experience_level: str # "total_beginner", "souls_veteran", "returning_player"
+    skill_confidence: str # "very_low", "low", "medium", "high", "very_high"
     preferred_archetype: str # "HEAVY_MELEE", "FAST_AGGRESSIVE", "SPELLCASTER", "HYBRID"
     current_hurdle: Optional[str] # e.g., "Stuck on Margit", "New Character", "Need endgame build"
     
@@ -63,8 +63,9 @@ class BuildState(TypedDict):
     final_response: Optional[str]
 
     # Player Profile
-    onboarding_completed: bool 
+    onboarding_completed: bool
     player_profile: PlayerProfile
+    current_level: Optional[int]
 
     # Build
     player_class: Optional[str]
