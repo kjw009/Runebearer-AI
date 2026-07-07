@@ -95,12 +95,16 @@ def build_state_to_summary(state: BuildState) -> str:
     agent_responses = state.get("agent_responses") or {}
     history_experts = list(agent_responses.keys())
     progress_str = ", ".join(history_experts) if history_experts else "None yet"
-    
+
+    intent_list = state.get("intent") or []
+    intent_str = ", ".join(intent_list) if intent_list else "Not yet classified"
+
     queue_list = state.get("intent_queue") or []
     queue_str = ", ".join(queue_list) if queue_list else "Empty"
-    
+
     progress_line = (
         f"Progress Check:\n"
+        f"       Original Classified Intent (do not alter): [{intent_str}]\n"
         f"       Historical Responses: [{progress_str}]\n"
         f"       Active Execution Queue remaining: [{queue_str}]"
     )
