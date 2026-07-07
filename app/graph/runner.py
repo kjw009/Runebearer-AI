@@ -1,9 +1,6 @@
 from typing import Any
-
 import asyncpg
-
 from app.graph.state import BuildState
-
 
 class GraphRunner:
     """
