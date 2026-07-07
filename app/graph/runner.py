@@ -6,6 +6,7 @@ import asyncpg
 from langfuse import get_client, observe
 
 from app.graph.state import BuildState
+from app.utils.json_safe import json_default
 
 
 class GraphRunner:
@@ -101,18 +102,30 @@ class GraphRunner:
         Yields SSE-formatted ``data:`` lines as the graph progresses through nodes.
         The last chunk is always the full terminal state so callers can persist
         the updated build state identically to the non-streaming path.
+
+        Streams in dual mode: "updates" chunks (small {node_name: partial_dict}
+        deltas — what actually goes out to the client) and "values" chunks (the
+        full accumulated state after each step — kept internally, never sent,
+        so the terminal event can extract the real final build state instead
+        of defaults). The compiled graph's default stream_mode is "updates"
+        alone, which only carries per-node deltas — _extract_build_state needs
+        the full state shape, which only "values" mode provides.
         """
         initial_state = self._build_initial_state(session_id, player_query, build_state)
-        last_state: dict[str, Any] = {}
+        last_full_state: dict[str, Any] = {}
 
-        async for chunk in self._graph.astream(initial_state):
-            last_state.update(chunk)
-            yield f"data: {json.dumps(chunk, default=str)}\n\n"
+        async for mode, chunk in self._graph.astream(initial_state, stream_mode=["updates", "values"]):
+            if mode == "values":
+                # Each "values" chunk is the complete state so far; the last
+                # one observed is the terminal state once the graph finishes.
+                last_full_state = chunk
+                continue
+            yield f"data: {json.dumps(chunk, default=json_default)}\n\n"
 
         # Emit a final event with the fully resolved terminal state so the API
         # layer can persist build state without special-casing.
         terminal = {
             "__terminal__": True,
-            "updated_build_state": self._extract_build_state(last_state),
+            "updated_build_state": self._extract_build_state(last_full_state),
         }
-        yield f"data: {json.dumps(terminal, default=str)}\n\n"
+        yield f"data: {json.dumps(terminal, default=json_default)}\n\n"
