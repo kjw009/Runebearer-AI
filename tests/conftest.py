@@ -1,5 +1,6 @@
 import pytest
 import asyncpg
+import httpx
 import redis.asyncio as aioredis
 
 from app.config import settings
@@ -20,3 +21,22 @@ async def redis_client() -> aioredis.Redis:
     set_redis(client)
     yield client
     await client.aclose()
+
+
+@pytest.fixture
+async def api_client(db_pool: asyncpg.Pool, redis_client: aioredis.Redis) -> httpx.AsyncClient:
+    """
+    An HTTP client wired directly to the app over ASGI (no real socket).
+    lifespan="on" runs app.main's own lifespan — which builds its own pool,
+    redis client, and compiled graph via settings, independently of the
+    db_pool/redis_client fixtures above. Both ultimately point at the same
+    configured Postgres/Redis, so this is safe; the fixtures above mainly
+    guarantee the infra is reachable before the app tries to use it.
+    """
+    from app.main import app
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", lifespan="on"
+    ) as client:
+        yield client

@@ -31,7 +31,8 @@ class BuildRepository:
                 talismans,
                 spirit_ash,
                 target_bosses,
-                playstyle
+                playstyle,
+                updated_at
             FROM builds
             WHERE session_id = $1::uuid;
         """
@@ -56,6 +57,9 @@ class BuildRepository:
                 "spirit_ash": data["spirit_ash"],
                 "target_bosses": parse_jsonb(data["target_bosses"]),
                 "playstyle": data["playstyle"],
+                # ISO string, not a datetime — CachedBuildRepository.get() caches
+                # this whole dict via json.dumps(), which can't serialize datetime.
+                "updated_at": data["updated_at"].isoformat(),
             }
 
     async def update(self, session_id: str, updated_build_state: dict) -> None:

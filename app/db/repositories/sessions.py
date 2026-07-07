@@ -9,10 +9,12 @@ class SessionRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self.pool = pool
 
-    async def create(self, player_name: str) -> dict:
+    async def create(self, player_name: str, starting_class: Optional[str] = None) -> dict:
         """
         Creates a new player session along with its default character build row
-        atomically inside a database transaction.
+        atomically inside a database transaction. starting_class is optional —
+        it's just a convenience seed for player_class; Melina's onboarding
+        interview remains the authoritative source and can still change it later.
         """
         session_query = """
             INSERT INTO sessions (player_name)
@@ -22,11 +24,11 @@ class SessionRepository:
 
         # onboarding_completed/player_profile/current_level and the rest of the
         # build columns all have sensible column-level defaults (see
-        # 001_init.sql / 003_onboarding.sql) — session_id is the only value
-        # that actually needs to be supplied here.
+        # 001_init.sql / 003_onboarding.sql) — session_id and (optionally)
+        # player_class are the only values that need to be supplied here.
         build_query = """
-            INSERT INTO builds (session_id)
-            VALUES ($1);
+            INSERT INTO builds (session_id, player_class)
+            VALUES ($1, $2);
         """
 
         # Wrap both inserts inside an atomic transaction block
@@ -40,7 +42,7 @@ class SessionRepository:
                 session_data = dict(session_row)
 
                 # 2. Insert blank default build row using the generated session UUID
-                await conn.execute(build_query, session_data["id"])
+                await conn.execute(build_query, session_data["id"], starting_class)
 
                 logger.info(f"Initialized fresh session and default build entry for tracker UUID: {session_data['id']}")
 
