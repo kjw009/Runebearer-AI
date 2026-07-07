@@ -80,6 +80,7 @@ class BuildState(TypedDict):
     rag_query: Optional[str]
     rag_results: list[RagChunk]
     rag_context: Optional[str]
+    citations: list[Citation]  # accumulated across every RAG call this turn; each rag_node call appends rather than replaces
 
     # Agent outputs
     agent_responses: dict[str, str]

@@ -69,11 +69,20 @@ async def guidance_of_grace_node(state: BuildState) -> dict:
         intent_queue.remove(next_agent)
 
     # 5. Compile Payload
+    # rag_context/rag_results are cleared here, not by the specialist that just ran.
+    # route_from_specialist decides "go to rag" vs "return to supervisor" by checking
+    # whether rag_context is populated — if the specialist cleared it in the same
+    # return that finishes its turn, that same clear would look identical to
+    # "haven't been to RAG yet" and bounce it straight back to RAG in a loop. Clearing
+    # it here instead, right before dispatching to whichever specialist runs next,
+    # guarantees each specialist starts its own turn with a clean slate.
     payload: dict[str, Any] = {
         "next_agent": next_agent,
         "intent_queue": intent_queue,
         "intent": intent,                                    # <-- FIXED: Persists to BuildState
-        "final_response": final_response
+        "final_response": final_response,
+        "rag_context": None,
+        "rag_results": [],
     }
 
     if final_response:
