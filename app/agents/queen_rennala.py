@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from app.graph.state import BuildState, BuildStats
+from app.observability.langfuse import agent_span
 from app.prompts.queen_rennala import QUEEN_RENNALA
 from app.utils.build_state_to_json import build_state_to_json
 from app.utils.specialist_llm import run_specialist
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 CALLING_AGENT = "rennala_stats"
 
 
+@agent_span("rennala_stats")
 async def rennala_stats_node(state: BuildState) -> dict:
     """
     Stat & Leveling Optimizer (stat_prioritisation). Two-phase: signal RAG first,

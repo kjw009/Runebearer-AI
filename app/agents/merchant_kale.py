@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from app.graph.state import BuildState
+from app.observability.langfuse import agent_span
 from app.prompts.merchant_kale import MERCHANT_KALE
 from app.utils.build_state_to_json import build_state_to_json
 from app.utils.specialist_llm import run_specialist
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 CALLING_AGENT = "kale_loot_routes"
 
 
+@agent_span("kale_loot_routes")
 async def kale_loot_routes_node(state: BuildState) -> dict:
     """
     Cartographer & Item Discovery (item_loot). Advisory only — no state_updates.

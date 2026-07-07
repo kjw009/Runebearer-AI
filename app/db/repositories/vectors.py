@@ -112,6 +112,11 @@ class VectorRepository:
 
         async with self.pool.acquire() as conn:
             await register_vector(conn)
+            # Tune HNSW recall for this connection. The default ef_search (40) trades
+            # recall for speed; 100 is a reasonable starting point to benchmark from.
+            # Higher = better recall, slower query. Tune against real data with
+            # EXPLAIN ANALYZE before committing to a final number.
+            await conn.execute("SET hnsw.ef_search = 100")
             # fetch() returns all matching rows as a list of asyncpg Record objects.
             # We use fetch() rather than execute() because we need to read the results.
             # execute() is for writes (INSERT, UPDATE, DELETE) where we don't need rows back.

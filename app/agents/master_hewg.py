@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from app.graph.state import BuildState, WeaponSlot
+from app.observability.langfuse import agent_span
 from app.prompts.master_hewg import MASTER_HEWG
 from app.utils.build_state_to_json import build_state_to_json
 from app.utils.specialist_llm import run_specialist
@@ -31,6 +32,7 @@ def _coerce_weapons(raw_weapons: list[Any]) -> list[WeaponSlot]:
     return coerced
 
 
+@agent_span("master_hewg_build")
 async def master_hewg_build_node(state: BuildState) -> dict:
     """
     Equipment & Build Architect (build_creation). Two-phase: signal RAG first,

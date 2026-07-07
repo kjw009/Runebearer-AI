@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from app.graph.state import BuildState
+from app.observability.langfuse import agent_span
 from app.prompts.iron_fist_alexander import ALEXANDER_COMBAT_COACH_SYSTEM
 from app.utils.build_state_to_json import build_state_to_json
 from app.utils.specialist_llm import run_specialist
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 CALLING_AGENT = "alexander_combat"
 
 
+@agent_span("alexander_combat")
 async def alexander_combat_node(state: BuildState) -> dict:
     """
     Combat Coach (combat_execution). Advisory only — no state_updates.

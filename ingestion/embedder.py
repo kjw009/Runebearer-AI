@@ -1,8 +1,23 @@
-from openai import AsyncOpenAI
 import asyncpg
+from openai import APIConnectionError, AsyncOpenAI, RateLimitError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random_exponential
+
 from app.config import settings
 from app.db.repositories.vectors import VectorRepository
 from ingestion.chunker import Chunk
+
+
+@retry(
+    retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+    wait=wait_random_exponential(min=1, max=20),
+    stop=stop_after_attempt(4),
+)
+async def _embed_batch(client: AsyncOpenAI, input_texts: list[str]):
+    """Retried batch embedding call — only rate-limit / connection errors are retried."""
+    return await client.embeddings.create(
+        model="text-embedding-3-small",
+        input=input_texts,
+    )
 
 
 class IngestEmbedder:
@@ -57,10 +72,7 @@ class IngestEmbedder:
             # Extract just the text content — the API doesn't need metadata.
             input_texts = [chunk.content for chunk in batch_chunks]
 
-            response = await self._client.embeddings.create(
-                model="text-embedding-3-small",
-                input=input_texts,
-            )
+            response = await _embed_batch(self._client, input_texts)
 
             # response.data is a list of Embedding objects in the same order
             # as input_texts. OpenAI guarantees this ordering, so vectors[0]

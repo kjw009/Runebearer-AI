@@ -1,7 +1,8 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
+from langfuse import get_client
 
 from app.api.middleware import register_middleware
 from app.api.routes.builds import router as builds_router
@@ -10,8 +11,9 @@ from app.api.routes.queries import router as queries_router
 from app.api.routes.sessions import router as sessions_router
 from app.db.postgres import create_pool
 from app.db.redis import create_redis_client
+from app.dependencies import set_graph, set_pool, set_redis
 from app.graph.builder import build_graph
-from app.dependencies import set_pool, set_redis, set_graph
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -22,6 +24,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     set_redis(redis)
     set_graph(graph)
     yield
+    # Flush any buffered Langfuse spans before closing connections —
+    # otherwise the last few requests' traces can be silently dropped.
+    get_client().flush()
     await pool.close()
     await redis.aclose()
 

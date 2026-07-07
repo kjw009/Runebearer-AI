@@ -1,6 +1,7 @@
 import asyncpg
 
 from app.graph.state import BuildState, Citation, RagChunk
+from app.observability.langfuse import rag_span
 from app.prompts.rag import RAG_CONTEXT_TEMPLATE
 from app.rag.query_rewriter import QueryRewriter
 from app.rag.reranker import Reranker
@@ -28,6 +29,7 @@ def make_rag_node(pool: asyncpg.Pool):
     reranker = Reranker()
     rewriter = QueryRewriter()
 
+    @rag_span
     async def rag_node(state: BuildState) -> dict:
         calling_agent = state["calling_agent"]
         entity_types = ENTITY_TYPE_MAP.get(calling_agent, [])

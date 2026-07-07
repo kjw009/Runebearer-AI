@@ -1,15 +1,35 @@
 import json
 import logging
 from typing import Any
-from anthropic import AsyncAnthropic
+
+from anthropic import APIConnectionError, AsyncAnthropic, RateLimitError
 from langchain_core.messages import AIMessage
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random_exponential
 
 from app.graph.state import BuildState
+from app.observability.langfuse import agent_span
 from app.prompts.maiden_melina import MAIDEN_MELINA
 from app.utils.anthropic_response import extract_text, parse_state_updates, strip_state_updates
 
 logger = logging.getLogger(__name__)
 
+
+@retry(
+    retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+    wait=wait_random_exponential(min=1, max=20),
+    stop=stop_after_attempt(4),
+)
+async def _call_melina_llm(client, system, user_content):
+    """Retried inner call — only rate-limit / connection errors are retried."""
+    return await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        system=system,
+        messages=[{"role": "user", "content": user_content}],
+        temperature=0.7,
+    )
+
+@agent_span("maiden_melina")
 async def maiden_melina_node(state: BuildState) -> dict:
     """
     Onboarding assessment node handled by Melina.
@@ -27,12 +47,10 @@ async def maiden_melina_node(state: BuildState) -> dict:
     # 2. Invoke conversational model
     async with AsyncAnthropic() as client:
         try:
-            response = await client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1500,
-                system=MAIDEN_MELINA.format(build_state_json=build_state_json),
-                messages=[{"role": "user", "content": f"Player Input: {state.get('player_query', '')}"}],
-                temperature=0.7,
+            response = await _call_melina_llm(
+                client,
+                MAIDEN_MELINA.format(build_state_json=build_state_json),
+                f"Player Input: {state.get('player_query', '')}",
             )
             raw_response_text = extract_text(response.content).strip()
         except Exception as e:

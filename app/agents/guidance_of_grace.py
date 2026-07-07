@@ -1,16 +1,36 @@
 import json
 import logging
 from typing import Any
-from anthropic import AsyncAnthropic
+
+from anthropic import APIConnectionError, AsyncAnthropic, RateLimitError
 from langchain_core.messages import AIMessage
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random_exponential
 
 from app.graph.state import BuildState
+from app.observability.langfuse import agent_span
 from app.prompts.guidance_of_grace import GUIDANCE_OF_GRACE
 from app.utils.anthropic_response import extract_text, safely_extract_json
 from app.utils.build_state_to_summary import build_state_to_summary
 
 logger = logging.getLogger(__name__)
 
+
+@retry(
+    retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+    wait=wait_random_exponential(min=1, max=20),
+    stop=stop_after_attempt(4),
+)
+async def _call_grace_llm(client, system, user_content):
+    """Retried inner call — only rate-limit / connection errors are retried."""
+    return await client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=2000,
+        system=system,
+        messages=[{"role": "user", "content": user_content}],
+        temperature=0.1,
+    )
+
+@agent_span("guidance_of_grace")
 async def guidance_of_grace_node(state: BuildState) -> dict:
     """
     State-based routing node for the Guidance of Grace supervisor.
@@ -29,12 +49,10 @@ async def guidance_of_grace_node(state: BuildState) -> dict:
     # 2. Execute LLM Routing Call
     async with AsyncAnthropic() as client:
         try:
-            response = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=2000,
-                system=GUIDANCE_OF_GRACE.format(build_state_summary=build_state_summary),
-                messages=[{"role": "user", "content": f"Player Input: {state.get('player_query', '')}"}],
-                temperature=0.1,
+            response = await _call_grace_llm(
+                client,
+                GUIDANCE_OF_GRACE.format(build_state_summary=build_state_summary),
+                f"Player Input: {state.get('player_query', '')}",
             )
             response_text = extract_text(response.content).strip()
         except Exception as e:

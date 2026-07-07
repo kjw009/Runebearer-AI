@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from app.graph.state import BuildState
+from app.observability.langfuse import agent_span
 from app.prompts.sir_gideon_ofnir import SIR_GIDEON_OFNIR
 from app.utils.build_state_to_json import build_state_to_json
 from app.utils.specialist_llm import run_specialist
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 CALLING_AGENT = "gideon_all_knowing"
 
 
+@agent_span("gideon_all_knowing")
 async def gideon_all_knowing_node(state: BuildState) -> dict:
     """
     Ultimate Combat, Boss & Status-Effect Tactician (boss_optimisation + status_effect,
